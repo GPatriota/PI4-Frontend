@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  Alert,
   Image,
   SafeAreaView,
   ScrollView,
-  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { AuthStackParamList } from '../../types';
+
 import { useAuth } from '../../contexts/AuthContext';
-import { MOCK_USERS } from '../../mocks/users';
+import { login } from '../../database/users';
+import { AuthStackParamList } from '../../types';
 
 type Props = {
   navigation: StackNavigationProp<AuthStackParamList, 'Login'>;
@@ -27,9 +28,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
 
   function handleLogin() {
-    const found = MOCK_USERS.find(
-      (u) => u.email === email.trim() && u.password === password
-    );
+    const found = login(email.trim(), password);
     if (found) {
       setUser(found);
     } else {
@@ -54,7 +53,6 @@ export default function LoginScreen({ navigation }: Props) {
           Sua jornada tecnológica começa aqui.{'\n'}Entre para explorar.
         </Text>
 
-        {/* Email */}
         <Text style={styles.label}>E-mail</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
@@ -69,7 +67,6 @@ export default function LoginScreen({ navigation }: Props) {
           />
         </View>
 
-        {/* Password */}
         <View style={styles.passwordHeader}>
           <Text style={styles.label}>Senha</Text>
           <TouchableOpacity>
@@ -95,15 +92,12 @@ export default function LoginScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Login button */}
         <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} activeOpacity={0.85}>
           <Text style={styles.primaryButtonText}>Entrar  →</Text>
         </TouchableOpacity>
 
-        {/* Separator */}
         <Text style={styles.separator}>NÃO TEM UMA CONTA?</Text>
 
-        {/* Register button */}
         <TouchableOpacity
           style={styles.outlinedButton}
           onPress={() => navigation.navigate('Register')}
@@ -112,7 +106,6 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.outlinedButtonText}>Criar conta gratuita</Text>
         </TouchableOpacity>
 
-        {/* Footer */}
         <Text style={styles.footer}>© 2024 ELECTROSHOP BRASIL</Text>
       </ScrollView>
     </SafeAreaView>
@@ -120,10 +113,7 @@ export default function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   container: {
     flexGrow: 1,
     paddingHorizontal: 24,
@@ -131,12 +121,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     alignItems: 'stretch',
   },
-  logo: {
-    width: 72,
-    height: 72,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
+  logo: { width: 72, height: 72, alignSelf: 'center', marginBottom: 20 },
   tagline: {
     fontSize: 15,
     color: '#6B7280',
@@ -144,12 +129,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 36,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,28 +141,16 @@ const styles = StyleSheet.create({
     height: 48,
     marginBottom: 16,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-  },
-  eyeIcon: {
-    padding: 4,
-  },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, fontSize: 14, color: '#111827' },
+  eyeIcon: { padding: 4 },
   passwordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
   },
-  forgotPassword: {
-    fontSize: 13,
-    color: '#2563EB',
-    fontWeight: '500',
-  },
+  forgotPassword: { fontSize: 13, color: '#2563EB', fontWeight: '500' },
   primaryButton: {
     backgroundColor: '#2563EB',
     borderRadius: 12,
@@ -192,11 +160,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 28,
   },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   separator: {
     fontSize: 12,
     color: '#9CA3AF',
@@ -213,15 +177,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 40,
   },
-  outlinedButtonText: {
-    color: '#2563EB',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  footer: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
+  outlinedButtonText: { color: '#2563EB', fontSize: 15, fontWeight: '600' },
+  footer: { fontSize: 11, color: '#9CA3AF', textAlign: 'center', letterSpacing: 0.5 },
 });

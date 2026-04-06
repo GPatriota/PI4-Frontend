@@ -1,17 +1,14 @@
 import * as SQLite from 'expo-sqlite';
-import migration001 from './migrations/001_initial';
+import migration1 from './migrations/1-initial-structure';
+import migration2 from './migrations/2-populate-initial-tables';
 
-// ─── Migration registry ─────────────────────────────────────────────────────
-// To add a new migration:
-//   1. Create src/database/migrations/002_your_change.ts
-//   2. Import it here and add it to this array (keep the array in order)
-const migrations = [migration001];
-// ────────────────────────────────────────────────────────────────────────────
+const migrations = [migration1, migration2];
 
 const db = SQLite.openDatabaseSync('electroshop.db');
 
 export function runMigrations() {
-  // Create the migrations tracking table if it doesn't exist
+  db.execSync('PRAGMA foreign_keys = ON;');
+
   db.execSync(`
     CREATE TABLE IF NOT EXISTS _migrations (
       id     INTEGER PRIMARY KEY AUTOINCREMENT,

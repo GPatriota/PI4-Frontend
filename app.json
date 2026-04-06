@@ -29,7 +29,12 @@
     "plugins": [
       "expo-sqlite",
       "expo-asset",
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-image-picker"
+    ],
+    "extra": {
+      "cloudinaryCloudName": "djo2iaa9m",
+      "cloudinaryUploadPreset": "electroshop_products"
+    }
   }
 }

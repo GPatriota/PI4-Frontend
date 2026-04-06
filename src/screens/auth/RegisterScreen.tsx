@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+  Alert,
   Image,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
+
+import { useAuth } from '../../contexts/AuthContext';
+import { create, findByEmail } from '../../database/users';
 import { AuthStackParamList } from '../../types';
 
 type Props = {
@@ -18,12 +22,37 @@ type Props = {
 };
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { setUser } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  function handleRegister() {
+    if (!name.trim() || !email.trim() || !password || !confirm) {
+      Alert.alert('Atenção', 'Preencha todos os campos.');
+      return;
+    }
+    if (password.length < 8 || !/\d/.test(password)) {
+      Alert.alert('Senha inválida', 'Mínimo de 8 caracteres e um número.');
+      return;
+    }
+    if (password !== confirm) {
+      Alert.alert('Erro', 'As senhas não coincidem.');
+      return;
+    }
+    if (findByEmail(email.trim())) {
+      Alert.alert('Erro', 'Este e-mail já está cadastrado.');
+      return;
+    }
+    const newUser = create({ name: name.trim(), email: email.trim().toLowerCase(), password });
+    setUser(newUser);
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Custom header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -42,11 +71,9 @@ export default function RegisterScreen({ navigation }: Props) {
           style={styles.logo}
           resizeMode="contain"
         />
-
         <Text style={styles.title}>Junte-se a nós</Text>
         <Text style={styles.tagline}>Sua jornada tecnológica começa aqui.</Text>
 
-        {/* Nome Completo */}
         <Text style={styles.label}>Nome Completo</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="person-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
@@ -55,10 +82,11 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="Ex: João Silva"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="words"
+            value={name}
+            onChangeText={setName}
           />
         </View>
 
-        {/* E-mail */}
         <Text style={styles.label}>E-mail</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
@@ -68,10 +96,11 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholderTextColor="#9CA3AF"
             keyboardType="email-address"
             autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
         </View>
 
-        {/* Senha */}
         <Text style={styles.label}>Senha</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
@@ -80,6 +109,8 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="••••••••"
             placeholderTextColor="#9CA3AF"
             secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
           />
           <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeIcon}>
             <Ionicons
@@ -90,7 +121,6 @@ export default function RegisterScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Confirmar Senha */}
         <Text style={styles.label}>Confirmar Senha</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
@@ -99,6 +129,8 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="••••••••"
             placeholderTextColor="#9CA3AF"
             secureTextEntry={!showConfirm}
+            value={confirm}
+            onChangeText={setConfirm}
           />
           <TouchableOpacity onPress={() => setShowConfirm((v) => !v)} style={styles.eyeIcon}>
             <Ionicons
@@ -109,25 +141,21 @@ export default function RegisterScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Hint */}
         <View style={styles.hintRow}>
           <Ionicons name="information-circle-outline" size={14} color="#9CA3AF" />
           <Text style={styles.hintText}> Mínimo de 8 caracteres e um número</Text>
         </View>
 
-        {/* Cadastrar button */}
-        <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleRegister} activeOpacity={0.85}>
           <Text style={styles.primaryButtonText}>Cadastrar  →</Text>
         </TouchableOpacity>
 
-        {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>OU CONTINUE COM</Text>
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Social buttons */}
         <View style={styles.socialRow}>
           <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
             <Text style={styles.socialButtonText}>🇧🇷  Google</Text>
@@ -137,7 +165,6 @@ export default function RegisterScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Login link */}
         <View style={styles.loginRow}>
           <Text style={styles.loginText}>Já tem uma conta? </Text>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -150,10 +177,7 @@ export default function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -163,45 +187,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  backButton: {
-    padding: 6,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 32,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  tagline: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
+  backButton: { padding: 6 },
+  headerTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  container: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 32 },
+  logo: { width: 60, height: 60, alignSelf: 'center', marginBottom: 16 },
+  title: { fontSize: 22, fontWeight: '700', color: '#111827', textAlign: 'center', marginBottom: 4 },
+  tagline: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 28 },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -213,26 +205,11 @@ const styles = StyleSheet.create({
     height: 48,
     marginBottom: 14,
   },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-  },
-  eyeIcon: {
-    padding: 4,
-  },
-  hintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  hintText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
+  inputIcon: { marginRight: 8 },
+  input: { flex: 1, fontSize: 14, color: '#111827' },
+  eyeIcon: { padding: 4 },
+  hintRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  hintText: { fontSize: 12, color: '#9CA3AF' },
   primaryButton: {
     backgroundColor: '#2563EB',
     borderRadius: 12,
@@ -241,32 +218,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 24,
   },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginHorizontal: 10,
-    letterSpacing: 0.5,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
-  },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
+  dividerText: { fontSize: 11, color: '#9CA3AF', marginHorizontal: 10, letterSpacing: 0.5 },
+  socialRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
   socialButton: {
     flex: 1,
     borderWidth: 1,
@@ -276,23 +232,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  socialButtonText: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  loginRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  loginLink: {
-    fontSize: 14,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
+  socialButtonText: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { fontSize: 14, color: '#6B7280' },
+  loginLink: { fontSize: 14, color: '#2563EB', fontWeight: '600' },
 });
