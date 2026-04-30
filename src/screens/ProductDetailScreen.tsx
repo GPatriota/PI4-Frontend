@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,8 +15,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../contexts/AuthContext';
-import * as cartItemsDb from '../database/cartItems';
-import * as productsDb from '../database/products';
+import { addCartItem, getProductById } from '../api/e2e';
 import type { AppStackParamList } from '../types';
 
 type Nav = StackNavigationProp<AppStackParamList, 'ProductDetail'>;
@@ -29,10 +28,15 @@ function formatPrice(value: number) {
 export default function ProductDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   const [qty, setQty] = useState(1);
+  const [product, setProduct] = useState<Awaited<ReturnType<typeof getProductById>> | null>(null);
 
-  const product = productsDb.findById(route.params.productId);
+  useEffect(() => {
+    getProductById(route.params.productId)
+      .then(setProduct)
+      .catch(() => setProduct(null));
+  }, [route.params.productId]);
 
   if (!product) {
     return (
@@ -46,10 +50,10 @@ export default function ProductDetailScreen() {
 
   const installment = product.price / 12;
 
-  function handleAddToCart() {
-    if (!user) return;
-    cartItemsDb.add(user.id, product!.id, qty);
-    Alert.alert('Adicionado!', `${product!.name} foi adicionado ao carrinho.`);
+  async function handleAddToCart() {
+    if (!accessToken || !user || !product) return;
+    await addCartItem(accessToken, product.id, qty);
+    Alert.alert('Adicionado!', `${product.name} foi adicionado ao carrinho.`);
   }
 
   return (
@@ -155,7 +159,9 @@ export default function ProductDetailScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.addButton, product.stock === 0 && styles.addButtonDisabled]}
-          onPress={handleAddToCart}
+          onPress={() => {
+            handleAddToCart().catch(() => Alert.alert('Erro', 'Nao foi possivel adicionar ao carrinho.'));
+          }}
           disabled={product.stock === 0}
           activeOpacity={0.85}
         >

@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../contexts/AuthContext';
-import * as ordersDb from '../database/orders';
+import { getOrderById, getOrders } from '../api/e2e';
 import type { AppStackParamList, Order, OrderWithItems } from '../types';
 
 type Nav = StackNavigationProp<AppStackParamList>;
@@ -39,27 +39,30 @@ const STATUS_COLOR: Record<Order['status'], string> = {
 
 export default function OrdersScreen() {
   const navigation = useNavigation<Nav>();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [detail, setDetail] = useState<OrderWithItems | null>(null);
 
-  const load = useCallback(() => {
-    if (!user) return;
-    setOrders(ordersDb.findByUser(user.id));
-  }, [user]);
+  const load = useCallback(async () => {
+    if (!user || !accessToken) return;
+    const data = await getOrders(accessToken);
+    setOrders(data);
+  }, [accessToken, user]);
 
   useEffect(() => {
-    load();
+    load().catch(() => setOrders([]));
   }, [load]);
 
-  function handleExpand(id: number) {
+  async function handleExpand(id: number) {
     if (expanded === id) {
       setExpanded(null);
       setDetail(null);
     } else {
       setExpanded(id);
-      setDetail(ordersDb.findById(id));
+      if (!accessToken) return;
+      const data = await getOrderById(accessToken, id);
+      setDetail(data);
     }
   }
 
@@ -97,7 +100,7 @@ export default function OrdersScreen() {
           const isExpanded = expanded === item.id;
           return (
             <View style={styles.orderCard}>
-              <TouchableOpacity onPress={() => handleExpand(item.id)} activeOpacity={0.85}>
+              <TouchableOpacity onPress={() => { handleExpand(item.id).catch(() => undefined); }} activeOpacity={0.85}>
                 <View style={styles.orderHeader}>
                   <View>
                     <Text style={styles.orderId}>Pedido #{item.id}</Text>

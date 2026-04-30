@@ -3,6 +3,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -10,12 +11,11 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../contexts/AuthContext';
-import * as cartItemsDb from '../database/cartItems';
-import * as ordersDb from '../database/orders';
+import { checkout, getCart, removeCartItem, updateCartItem } from '../api/e2e';
 import type { AppStackParamList, CartItemWithProduct } from '../types';
 
 type Nav = StackNavigationProp<AppStackParamList>;
@@ -28,50 +28,82 @@ function formatPrice(value: number) {
 
 export default function CartScreen() {
   const navigation = useNavigation<Nav>();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   const [items, setItems] = useState<CartItemWithProduct[]>([]);
+  const [totals, setTotals] = useState({ subtotal: 0, shipping: 0, total: 0 });
 
-  const loadCart = useCallback(() => {
-    if (!user) return;
-    setItems(cartItemsDb.findByUser(user.id));
-  }, [user]);
+  const loadCart = useCallback(async () => {
+    if (!user || !accessToken) {
+      console.warn('Cart skipped: missing session', { hasUser: Boolean(user), hasToken: Boolean(accessToken) });
+      return;
+    }
+
+    console.log('Cart loading from API...');
+    const result = await getCart(accessToken);
+    setItems(result.items);
+    setTotals(result.totals);
+  }, [accessToken, user]);
 
   useEffect(() => {
-    loadCart();
+    loadCart().catch(() => {
+      console.warn('Cart load failed');
+      setItems([]);
+      setTotals({ subtotal: 0, shipping: 0, total: 0 });
+    });
   }, [loadCart]);
 
-  const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 19.9;
-  const total = subtotal + shipping;
+  useFocusEffect(
+    useCallback(() => {
+      loadCart().catch((error) => {
+        console.warn('Cart focus reload failed', error);
+      });
+    }, [loadCart])
+  );
 
-  function handleRemove(id: number) {
-    cartItemsDb.remove(id);
-    loadCart();
+  const subtotal = totals.subtotal;
+  const shipping = totals.shipping;
+  const total = totals.total;
+
+  async function handleRemove(id: number) {
+    if (!accessToken) {
+      Alert.alert('Sessao expirada', 'Faca login novamente para atualizar o carrinho.');
+      return;
+    }
+    await removeCartItem(accessToken, id);
+    await loadCart();
   }
 
-  function handleUpdateQty(id: number, qty: number) {
-    if (qty < 1) {
-      cartItemsDb.remove(id);
-    } else {
-      cartItemsDb.updateQuantity(id, qty);
+  async function handleUpdateQty(id: number, qty: number) {
+    if (!accessToken) {
+      Alert.alert('Sessao expirada', 'Faca login novamente para atualizar o carrinho.');
+      return;
     }
-    loadCart();
+    if (qty < 1) {
+      await removeCartItem(accessToken, id);
+    } else {
+      await updateCartItem(accessToken, id, qty);
+    }
+    await loadCart();
   }
 
   function handleCheckout() {
-    if (!user || items.length === 0) return;
+    if (!accessToken || !user || items.length === 0) return;
     Alert.alert('Finalizar Compra', `Total: ${formatPrice(total)}\nConfirmar pedido?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Confirmar',
-        onPress: () => {
-          ordersDb.create(
-            user.id,
-            items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.product.price })),
-            shipping
-          );
-          setItems([]);
-          navigation.navigate('Main', { screen: 'Pedidos' } as never);
+        onPress: async () => {
+          try {
+            const result = await checkout(accessToken);
+            const url = result.payment.checkoutUrl || result.payment.sandboxCheckoutUrl;
+            if (url) {
+              await Linking.openURL(url);
+            }
+            await loadCart();
+            navigation.navigate('Main', { screen: 'Pedidos' } as never);
+          } catch {
+            Alert.alert('Erro', 'Nao foi possivel iniciar o checkout.');
+          }
         },
       },
     ]);
@@ -139,19 +171,23 @@ export default function CartScreen() {
                 <View style={styles.qtyRow}>
                   <TouchableOpacity
                     style={styles.qtyBtn}
-                    onPress={() => handleUpdateQty(item.id, item.quantity - 1)}
+                    onPress={() => {
+                      handleUpdateQty(item.id, item.quantity - 1).catch(() => undefined);
+                    }}
                   >
                     <Ionicons name="remove" size={14} color="#374151" />
                   </TouchableOpacity>
                   <Text style={styles.qtyValue}>{item.quantity}</Text>
                   <TouchableOpacity
                     style={styles.qtyBtn}
-                    onPress={() => handleUpdateQty(item.id, item.quantity + 1)}
+                    onPress={() => {
+                      handleUpdateQty(item.id, item.quantity + 1).catch(() => undefined);
+                    }}
                   >
                     <Ionicons name="add" size={14} color="#374151" />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => handleRemove(item.id)}>
+                <TouchableOpacity onPress={() => { handleRemove(item.id).catch(() => undefined); }}>
                   <Ionicons name="trash-outline" size={18} color="#EF4444" />
                 </TouchableOpacity>
               </View>

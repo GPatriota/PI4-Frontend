@@ -15,9 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../contexts/AuthContext';
-import * as cartItemsDb from '../database/cartItems';
-import * as categoriesDb from '../database/categories';
-import * as productsDb from '../database/products';
+import { addCartItem, getCategories, getProducts } from '../api/e2e';
 import type { AppStackParamList, Category, Product } from '../types';
 
 type Nav = StackNavigationProp<AppStackParamList>;
@@ -79,7 +77,7 @@ function ProductCard({ product, onPress, onAddCart }: {
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   const isAdmin = user?.email.includes('admin') ?? false;
 
   const [search, setSearch] = useState('');
@@ -87,27 +85,32 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
 
-  const loadProducts = useCallback(() => {
-    if (search.trim()) {
-      setProducts(productsDb.search(search.trim()));
-    } else if (selectedCategory != null) {
-      setProducts(productsDb.findByCategory(selectedCategory));
-    } else {
-      setProducts(productsDb.findAll(true));
-    }
-  }, [search, selectedCategory]);
+  const loadProducts = useCallback(async () => {
+    const categoryName = selectedCategory != null
+      ? categories.find((category) => category.id === selectedCategory)?.name
+      : undefined;
+
+    const result = await getProducts({
+      active: true,
+      category: categoryName,
+      search: search.trim() || undefined,
+      page: 1,
+      limit: 50,
+    });
+    setProducts(result);
+  }, [categories, search, selectedCategory]);
 
   useEffect(() => {
-    setCategories(categoriesDb.findAll());
+    getCategories().then(setCategories).catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
-    loadProducts();
+    loadProducts().catch(() => setProducts([]));
   }, [loadProducts]);
 
-  function handleAddToCart(productId: number) {
-    if (!user) return;
-    cartItemsDb.add(user.id, productId, 1);
+  async function handleAddToCart(productId: number) {
+    if (!accessToken || !user) return;
+    await addCartItem(accessToken, productId, 1);
   }
 
   return (
@@ -209,7 +212,9 @@ export default function HomeScreen() {
               <ProductCard
                 product={item}
                 onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-                onAddCart={() => handleAddToCart(item.id)}
+                onAddCart={() => {
+                  handleAddToCart(item.id).catch(() => undefined);
+                }}
               />
             )}
           />

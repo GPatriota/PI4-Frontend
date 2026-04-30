@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { login } from '../../database/users';
+import { loginUser } from '../../api/e2e';
 import { AuthStackParamList } from '../../types';
 
 type Props = {
@@ -22,16 +22,20 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
-  const { setUser } = useAuth();
+  const { setSession } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  function handleLogin() {
-    const found = login(email.trim(), password);
-    if (found) {
-      setUser(found);
-    } else {
+  async function handleLogin() {
+    try {
+      const result = await loginUser(email.trim(), password);
+      setSession(result.user, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error) {
+      console.warn('Login failed', error);
       Alert.alert('Erro', 'E-mail ou senha incorretos.');
     }
   }
