@@ -1,36 +1,55 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { findById } from '../database/users';
+import { getCurrentUser } from '../api/e2e';
 import type { User } from '../types';
 
 const USER_ID_KEY = '@electroshop_user_id';
+const ACCESS_TOKEN_KEY = '@electroshop_access_token';
+const REFRESH_TOKEN_KEY = '@electroshop_refresh_token';
 
 type AuthContextType = {
+  accessToken: string | null;
   isLoading: boolean;
   logout: () => void;
+  refreshToken: string | null;
+  setSession: (user: User | null, tokens?: { accessToken: string; refreshToken: string }) => void;
   setUser: (user: User | null) => void;
   user: User | null;
 };
 
 export const AuthContext = createContext<AuthContextType>({
+  accessToken: null,
   isLoading: true,
   logout: () => {},
+  refreshToken: null,
+  setSession: () => {},
   setUser: () => {},
   user: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(USER_ID_KEY)
-      .then((stored) => {
-        if (stored) {
-          const id = parseInt(stored, 10);
-          const found = findById(id);
-          if (found) setUserState(found);
+    Promise.all([AsyncStorage.getItem(USER_ID_KEY), AsyncStorage.getItem(ACCESS_TOKEN_KEY), AsyncStorage.getItem(REFRESH_TOKEN_KEY)])
+      .then(async ([storedUserId, storedAccessToken, storedRefreshToken]) => {
+        if (storedUserId && storedAccessToken) {
+          try {
+            const currentUser = await getCurrentUser(storedAccessToken);
+            setUserState(currentUser);
+            setAccessToken(storedAccessToken);
+            setRefreshToken(storedRefreshToken);
+          } catch {
+            await Promise.all([
+              AsyncStorage.removeItem(USER_ID_KEY),
+              AsyncStorage.removeItem(ACCESS_TOKEN_KEY),
+              AsyncStorage.removeItem(REFRESH_TOKEN_KEY),
+            ]);
+          }
         }
       })
       .catch(console.warn)
@@ -42,16 +61,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (u) {
       AsyncStorage.setItem(USER_ID_KEY, String(u.id));
     } else {
-      AsyncStorage.removeItem(USER_ID_KEY);
+      Promise.all([
+        AsyncStorage.removeItem(USER_ID_KEY),
+        AsyncStorage.removeItem(ACCESS_TOKEN_KEY),
+        AsyncStorage.removeItem(REFRESH_TOKEN_KEY),
+      ]).catch(() => undefined);
+      setAccessToken(null);
+      setRefreshToken(null);
     }
   }
 
+  function setSession(u: User | null, tokens?: { accessToken: string; refreshToken: string }) {
+    setUserState(u);
+    if (u && tokens) {
+      setAccessToken(tokens.accessToken);
+      setRefreshToken(tokens.refreshToken);
+      Promise.all([
+        AsyncStorage.setItem(USER_ID_KEY, String(u.id)),
+        AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken),
+        AsyncStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken),
+      ]).catch(() => undefined);
+      return;
+    }
+
+    setAccessToken(null);
+    setRefreshToken(null);
+    Promise.all([
+      AsyncStorage.removeItem(USER_ID_KEY),
+      AsyncStorage.removeItem(ACCESS_TOKEN_KEY),
+      AsyncStorage.removeItem(REFRESH_TOKEN_KEY),
+    ]).catch(() => undefined);
+  }
+
   function logout() {
-    setUser(null);
+    setSession(null);
   }
 
   return (
-    <AuthContext.Provider value={{ isLoading, logout, setUser, user }}>
+    <AuthContext.Provider value={{ accessToken, isLoading, logout, refreshToken, setSession, setUser, user }}>
       {children}
     </AuthContext.Provider>
   );

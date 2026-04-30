@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../contexts/AuthContext';
-import * as addressesDb from '../database/addresses';
+import { getAddresses } from '../api/e2e';
 import type { Address, AppStackParamList } from '../types';
 
 type Nav = StackNavigationProp<AppStackParamList>;
@@ -49,17 +49,20 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { accessToken, user, logout } = useAuth();
   const navigation = useNavigation<Nav>();
   const isAdmin = user?.email.includes('admin') ?? false;
   const [adminMode, setAdminMode] = useState(false);
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    const addresses = addressesDb.findByUser(user.id);
-    setDefaultAddress(addresses.find((a) => a.isDefault) ?? addresses[0] ?? null);
-  }, [user]);
+    if (!user || !accessToken) return;
+    getAddresses(accessToken)
+      .then((addresses) => {
+        setDefaultAddress(addresses.find((a) => a.isDefault) ?? addresses[0] ?? null);
+      })
+      .catch(() => setDefaultAddress(null));
+  }, [accessToken, user]);
 
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
